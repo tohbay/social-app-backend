@@ -63,4 +63,81 @@ const deletePost = async (req, res) => {
   }
 };
 
-export { getPost, createPost, deletePost };
+const likeUnlikePost = async (req, res) => {
+  try {
+    const { id: postId } = req.params;
+    const userId = req.user._id;
+
+    const post = await Post.findById(postId);
+
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const userLikedPost = post.likes.includes(userId);
+
+    if (userLikedPost) {
+      await Post.updateOne({ _id: postId }, { $pull: { likes: userId } });
+      res.status(200).json({ message: "Post unliked successfully" });
+    } else {
+      post.likes.push(userId);
+      await post.save();
+      res.status(200).json({ message: "Post liked successfully" });
+    }
+  } catch (error) {
+    console.log("Error from likeUnlikePost", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const replyToPost = async (req, res) => {
+  try {
+    const { id: postId } = req.params;
+    const { text } = req.body;
+    const userId = req.user._id;
+    const userProfilePic = req.user.profilePic;
+    const username = req.user.username;
+
+    if (!text) return res.status(400).json({ message: "Text is required" });
+
+    const post = await Post.findById(postId);
+
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const reply = { userId, text, userProfilePic, username };
+
+    post.replies.push(reply);
+    await post.save();
+
+    res.status(200).json({ message: "Post replied successfully", post });
+  } catch (error) {
+    console.log("Error from replyToPost", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getFeedPosts = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const following = user.following;
+
+    const feedPosts = await Post.find({
+      postedBy: { $in: following },
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ feedPosts });
+  } catch (error) {
+    console.log("Error from getFeedPosts", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export {
+  getFeedPosts,
+  getPost,
+  createPost,
+  deletePost,
+  likeUnlikePost,
+  replyToPost,
+};
